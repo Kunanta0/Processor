@@ -3,29 +3,37 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#define LABELS_SIZE 50
 
 enum
 {
-    HLT,
-    PUSH,
-    ADD,
-    SUB,
-    DIV,
-    OUT,
-    MUL,
-    POP,
-    PUSHr,
-    JMP,
-    JA,
-    JAE,
-    JB,
-    JBE,
-    JE,
-    JNE,
-    CALL,
-    RET,
-    IN
+    HLT = 0,
+    PUSH = 1,
+    ADD = 2,
+    SUB = 3,
+    DIV = 4,
+    OUT = 5,
+    MUL = 6,
+    POP = 7,
+    PUSHr = 8,
+    JMP = 9,
+    JA = 10,
+    JAE = 11,
+    JB = 12,
+    JBE = 13,
+    JE = 14,
+    JNE = 15,
+    CALL = 16,
+    RET = 17,
+    IN = 18
 };
+
+enum
+{
+    NO_LABEL = 0,
+    WITH_LABEL = 1
+};
+
 
 typedef struct
 {
@@ -37,25 +45,26 @@ typedef struct
 {
     Line* code;
     size_t current_translating;
+    int labels[LABELS_SIZE];
 } Translator;
 
-Translator FillCode(char* buffer, size_t length, size_t* nlines, int* labels);
+Translator FillCode(char* buffer, size_t length, size_t* nlines);
 size_t GetSize(const char* filename);
 size_t GetLines(char* buffer, size_t length);
 char* ReadFile(const char* name, size_t* length);
-Line GetLine(char* line, int* labels);
+void GetLine(Translator* Machine, char* line, size_t i);
 void WriteCode(Translator* arr, const char* filename, size_t nlines);
-void GetCommand(Line* command, char* cmd);
+int GetCommand(Translator* Machine, char* cmd, char* line, size_t i);
+void FillLabels(Translator* Machine);
 
 int main()
 {
-    int labels[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     size_t length = 0;
     char* buffer = ReadFile("code.txt", &length);
     //printf("%s\n", buffer);
 
     size_t nlines = 0;
-    Translator code = FillCode(buffer, length, &nlines, labels);
+    Translator code = FillCode(buffer, length, &nlines);
 
     WriteCode(&code, "machine_code.txt", nlines);
     free(buffer);
@@ -102,13 +111,29 @@ size_t GetLines(char* buffer, size_t length)
     return nlines;
 }
 
-Translator FillCode(char* buffer, size_t length, size_t* nlines, int* labels)
+void FillLabels(Translator* Machine)
+{
+    for (int i = 0; i < LABELS_SIZE; ++i) Machine->labels[i] = -1;
+}
+
+void PrintLabels(Translator* Machine)
+{
+    printf("LABELS:\n");
+    for (int i = 0; i < LABELS_SIZE; ++i) printf("%d ", Machine->labels[i]);
+    printf("\n");
+    getchar();
+}
+
+Translator FillCode(char* buffer, size_t length, size_t* nlines)
 {
     *nlines = GetLines(buffer, length);
     //printf("%lld\n", *nlines);
 
     Translator Machine = {};
     Machine.code = (Line*)calloc(*nlines, sizeof(Line));
+
+    FillLabels(&Machine);
+    //PrintLabels(&Machine);
 
     int* index_lines = (int*)calloc(*nlines, sizeof(int));
 
@@ -122,57 +147,66 @@ Translator FillCode(char* buffer, size_t length, size_t* nlines, int* labels)
         }
     }
 
-    Machine.current_translating = 0;
-    for (size_t i = 0; i < *nlines; ++i)
+    for (size_t j = 0; j < 2; ++j)
     {
-        //printf("%d\n", Machine.current_translating);
-        Machine.code[i] = GetLine(buffer + index_lines[i], labels);
-        Machine.current_translating += Machine.code[i].length;
+        Machine.current_translating = 0;
+        for (size_t i = 0; i < *nlines; ++i)
+        {
+            printf("[%lld]\n", Machine.current_translating);
+            GetLine(&Machine, buffer + index_lines[i], i);
+            Machine.current_translating += Machine.code[i].length;
+        }
     }
+
     free(index_lines);
 
     return Machine;
 }
 
-Line GetLine(char* line, int* labels)
+void GetLine(Translator* Machine, char* line, size_t i)
 {
-    Line command = {};
     char cmd[10];
     int number;
-    command.length = sscanf(line, "%9s %d", cmd, &number);
+    (Machine->code[i]).length = sscanf(line, "%5s %d", cmd, &number);
+    printf("{%s} {%d}\n", cmd, Machine->code[i].length);
 
-    if (strcmp(cmd, "POP") == 0 || (strcmp(cmd, "PUSH") == 0 && command.length == 1))
+    if (strcmp(cmd, "POP") == 0 || (strcmp(cmd, "PUSH") == 0 && (Machine->code[i]).length == 1))
     {
-        command.length = 2;
-        if (strcmp(cmd, "POP") == 0) command.line[0] = POP;
-        if (strcmp(cmd, "PUSH") == 0) command.line[0] = PUSHr;
+        (Machine->code[i]).length = 2;
+        if (strcmp(cmd, "POP") == 0) (Machine->code[i]).line[0] = POP;
+        if (strcmp(cmd, "PUSH") == 0) (Machine->code[i]).line[0] = PUSHr;
         char reg[3];
         sscanf(line, "%s %s", cmd, reg);
         //printf("reg: %s\n", reg);
-        if (strcmp(reg, "AX") == 0) command.line[1] = 0;
-        if (strcmp(reg, "BX") == 0) command.line[1] = 1;
-        if (strcmp(reg, "CX") == 0) command.line[1] = 2;
-        if (strcmp(reg, "DX") == 0) command.line[1] = 3;
-        fprintf(stdout, "%d %d\n", command.line[0], command.line[1]);
-        return command;
+        if (strcmp(reg, "AX") == 0) (Machine->code[i]).line[1] = 0;
+        if (strcmp(reg, "BX") == 0) (Machine->code[i]).line[1] = 1;
+        if (strcmp(reg, "CX") == 0) (Machine->code[i]).line[1] = 2;
+        if (strcmp(reg, "DX") == 0) (Machine->code[i]).line[1] = 3;
+        fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
+        return;
     }
 
-    GetCommand(&command, cmd);
     if (strcmp(cmd, ":") == 0)
     {
-        command.length = 0;
+        Machine->code[i].length = 0;
+        Machine->labels[number] = Machine->current_translating;
+        return;
     }
 
-    if (command.length == 2)
+    int state = GetCommand(Machine, cmd, line, i);
+
+    if (state == NO_LABEL)
     {
-        command.line[1] = number;
-        fprintf(stdout, "%d %d\n", command.line[0], command.line[1]);
+        if ((Machine->code[i]).length == 2)
+        {
+            (Machine->code[i]).line[1] = number;
+            fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
+        }
+        if ((Machine->code[i]).length == 1)
+        {
+            fprintf(stdout, "%d\n", (Machine->code[i]).line[0]);
+        }
     }
-    if (command.length == 1)
-    {
-        fprintf(stdout, "%d\n", command.line[0]);
-    }
-    return command;
 }
 
 char* ReadFile(const char* name, size_t* length)
@@ -185,29 +219,44 @@ char* ReadFile(const char* name, size_t* length)
     return buffer;
 }
 
-void GetCommand(Line* command, char* cmd)
+int GetCommand(Translator* Machine, char* cmd, char* line, size_t i)
 {
-    if (strcmp(cmd, "SUB") == 0) command->line[0] = SUB;
-    if (strcmp(cmd, "PUSH") == 0) command->line[0] = PUSH;
-    if (strcmp(cmd, "OUT") == 0) command->line[0] = OUT;
-    if (strcmp(cmd, "HLT") == 0) command->line[0] = HLT;
-    if (strcmp(cmd, "DIV") == 0) command->line[0] = DIV;
-    if (strcmp(cmd, "ADD") == 0) command->line[0] = ADD;
-    if (strcmp(cmd, "MUL") == 0) command->line[0] = MUL;
+    if (strcmp(cmd, "SUB") == 0) {(Machine->code[i]).line[0] = SUB; return NO_LABEL;}
+    if (strcmp(cmd, "PUSH") == 0) {(Machine->code[i]).line[0] = PUSH; return NO_LABEL;}
+    if (strcmp(cmd, "OUT") == 0) {(Machine->code[i]).line[0] = OUT; return NO_LABEL;}
+    if (strcmp(cmd, "HLT") == 0) {(Machine->code[i]).line[0] = HLT; return NO_LABEL;}
+    if (strcmp(cmd, "DIV") == 0) {(Machine->code[i]).line[0] = DIV; return NO_LABEL;}
+    if (strcmp(cmd, "ADD") == 0) {(Machine->code[i]).line[0] = ADD; return NO_LABEL;}
+    if (strcmp(cmd, "MUL") == 0) {(Machine->code[i]).line[0] = MUL; return NO_LABEL;}
+    if (strcmp(cmd, "RET") == 0) {(Machine->code[i]).line[0] = RET; return NO_LABEL;}
+    if (strcmp(cmd, "IN") == 0) {(Machine->code[i]).line[0] = IN; return NO_LABEL;}
 
     {
-        if (strcmp(cmd, "JMP") == 0) command->line[0] = JMP;
-        if (strcmp(cmd, "JA") == 0) command->line[0] = JA;
-        if (strcmp(cmd, "JAE") == 0) command->line[0] = JAE;
-        if (strcmp(cmd, "JB") == 0) command->line[0] = JB;
-        if (strcmp(cmd, "JBE") == 0) command->line[0] = JBE;
-        if (strcmp(cmd, "JE") == 0) command->line[0] = JE;
-        if (strcmp(cmd, "JNE") == 0) command->line[0] = JNE;
+        if (strcmp(cmd, "CALL") == 0) (Machine->code[i]).line[0] = CALL;
+        if (strcmp(cmd, "JMP") == 0) (Machine->code[i]).line[0] = JMP;
+        if (strcmp(cmd, "JA") == 0) (Machine->code[i]).line[0] = JA;
+        if (strcmp(cmd, "JAE") == 0) (Machine->code[i]).line[0] = JAE;
+        if (strcmp(cmd, "JB") == 0) (Machine->code[i]).line[0] = JB;
+        if (strcmp(cmd, "JBE") == 0) (Machine->code[i]).line[0] = JBE;
+        if (strcmp(cmd, "JE") == 0) (Machine->code[i]).line[0] = JE;
+        if (strcmp(cmd, "JNE") == 0) (Machine->code[i]).line[0] = JNE;
+        printf("!%d!\n", Machine->code[i].length);
+        if (Machine->code[i].length == 1)
+        {
+            char a[5] = {};
+            int label = 0;
+            sscanf(line, "%5s : %d", a, &label);
+            //printf("label = %d\n", label);
+            //PrintLabels(Machine);
+            Machine->code[i].line[1] = (Machine->labels)[label];
+            Machine->code[i].length = 2;
+            printf("{%d}\n", Machine->code[i].length);
+            //printf("code[1] = %d\n", Machine->code[i].line[1]);
+            return WITH_LABEL;
+        }
     }
 
-    if (strcmp(cmd, "CALL") == 0) command->line[0] = CALL;
-    if (strcmp(cmd, "RET") == 0) command->line[0] = RET;
-    if (strcmp(cmd, "IN") == 0) command->line[0] = IN;
+    return NO_LABEL;
 }
 
 //походу придется либо редачить передачей транслятора по адресу, либо добавить поле label в Line. Второе легче, но много памяти жрет впустую
