@@ -8,6 +8,7 @@ typedef int StackElem_t;
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "stack.h"
+#include "proc.h"
 
 #define RED "\033[31m"
 #define GREEN "\033[32m"
@@ -15,7 +16,7 @@ typedef int StackElem_t;
 #define RESET "\033[0m"
 #define BLUE "\033[34m"
 
-enum
+/*enum
 {
     HLT = 0,//
     PUSH = 1,//
@@ -36,9 +37,7 @@ enum
     CALL = 16,
     RET = 17,
     IN = 18
-};
-
-int labels[10] = {};
+};*/
 
 typedef struct
 {
@@ -53,6 +52,24 @@ void CreateProcessor(Processor* code, char* buffer, size_t length);
 size_t GetSize(const char* filename);
 void Run(Processor* code);
 void ProcessorDump(Processor* code);
+
+void FillPush(stack_t* stk, Processor* code);
+void FillAdd(stack_t* stk, Processor* code);
+void FillSub(stack_t* stk, Processor* code);
+void FillDiv(stack_t* stk, Processor* code);
+void FillOut(stack_t* stk, Processor* code);
+void FillMul(stack_t* stk, Processor* code);
+void FillPop(stack_t* stk, Processor* code);
+void FillPushr(stack_t* stk, Processor* code);
+void FillJa(stack_t* stk, Processor* code);
+void FillJae(stack_t* stk, Processor* code);
+void FillJb(stack_t* stk, Processor* code);
+void FillJbe(stack_t* stk, Processor* code);
+void FillJe(stack_t* stk, Processor* code);
+void FillJne(stack_t* stk, Processor* code);
+void FillCall(stack_t* stk, Processor* code);
+void FillRet(stack_t* stk, Processor* code);
+void FillIn(stack_t* stk, Processor* code);
 
 int main()
 {
@@ -69,6 +86,136 @@ int main()
     return 0;
 }
 
+void FillPush(stack_t* stk, Processor* code)
+{
+    StackPush(stk, code->data[code->pc + 1]);
+    code->pc += 2;
+}
+void FillAdd(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    code->pc += 1;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    StackPush(stk, value_1 + value_2);
+}
+void FillSub(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    code->pc += 1;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    StackPush(stk, value_2 - value_1);
+}
+void FillDiv(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    code->pc += 1;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    StackPush(stk, value_2 / value_1);
+}
+void FillOut(stack_t* stk, Processor* code)
+{
+    int answer = 0;
+    code->pc += 1;
+    StackPop(stk, &answer);
+    printf("%d\n", answer);
+}
+void FillMul(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    code->pc += 1;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    StackPush(stk, value_1 * value_2);
+}
+void FillPop(stack_t* stk, Processor* code)
+{
+    StackPop(stk, &(code->registr[code->data[code->pc + 1]]));
+    code->pc += 2;
+}
+void FillPushr(stack_t* stk, Processor* code)
+{
+    StackPush(stk, code->registr[code->data[code->pc + 1]]);
+    code->pc += 2;
+}
+void FillJa(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    //printf("%d %d\n", value_1, value_2);
+    if (value_1 > value_2) code->pc = code->data[code->pc + 1];
+    else code->pc += 2;
+}
+void FillJae(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    //printf("%d %d\n", value_1, value_2);
+    if (value_1 >= value_2) code->pc = code->data[code->pc + 1];
+    else code->pc += 2;
+}
+void FillJb(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    //printf("%d %d\n", value_1, value_2);
+    if (value_1 < value_2) code->pc = code->data[code->pc + 1];
+    else code->pc += 2;
+}
+void FillJbe(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    //printf("%d %d\n", value_1, value_2);
+    if (value_1 <= value_2) code->pc = code->data[code->pc + 1];
+    else code->pc += 2;
+}
+void FillJe(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    //printf("%d %d\n", value_1, value_2);
+    if (value_1 == value_2) code->pc = code->data[code->pc + 1];
+    else code->pc += 2;
+}
+void FillJne(stack_t* stk, Processor* code)
+{
+    int value_1 = 0, value_2 = 0;
+    StackPop(stk, &value_1);
+    StackPop(stk, &value_2);
+    //printf("%d %d\n", value_1, value_2);
+    if (value_1 != value_2) code->pc = code->data[code->pc + 1];
+    else code->pc += 2;
+}
+void FillCall(stack_t* foo, Processor* code)
+{
+    StackPush(foo, code->pc + 2);
+    //printf("%d\n", code->pc + 2);
+    code->pc = code->data[code->pc + 1];
+}
+void FillRet(stack_t* foo, Processor* code)
+{
+    int answer = 0;
+    StackPop(foo, &answer);
+    code->pc = answer;
+}
+void FillIn(stack_t* stk, Processor* code)
+{
+    int answer = 0;
+    code->pc += 1;
+    scanf("%d", &answer);
+    //printf("%d\n", answer);
+    StackPush(stk, answer);
+    //printf("%d\n", code->pc);
+}
+
 void Run(Processor* code)
 {
     stack_t foo = {};
@@ -77,116 +224,65 @@ void Run(Processor* code)
     stack_t* stk = &stak;
     StackCtor(stk, 1);
     code->pc = 0;
-    int value_1 = 0, value_2 = 0;
-    int answer = 0;
     while (code->pc < code->length)
     {
     //ProcessorDump(code);
     switch (code->data[code->pc]){
         case HLT:
-            code->pc += 1;
             return;
         case PUSH:
-            StackPush(stk, code->data[code->pc + 1]);
-            code->pc += 2;
+            FillPush(stk, code);
             break;
         case ADD:
-            code->pc += 1;
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            StackPush(stk, value_1 + value_2);
+            FillAdd(stk, code);;
             break;
         case SUB:
-            code->pc += 1;
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            StackPush(stk, value_2 - value_1);
+            FillSub(stk, code);
             break;
         case DIV:
-            code->pc += 1;
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            StackPush(stk, value_2 / value_1);
+            FillDiv(stk, code);
             break;
         case OUT:
-            code->pc += 1;
-            StackPop(stk, &answer);
-            printf("%d\n", answer);
+            FillOut(stk, code);
             break;
         case MUL:
-            code->pc += 1;
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            StackPush(stk, value_1 * value_2);
+            FillMul(stk, code);
             break;
         case POP:
-            StackPop(stk, &(code->registr[code->data[code->pc + 1]]));
-            code->pc += 2;
+            FillPop(stk, code);
             break;
         case PUSHr:
-            StackPush(stk, code->registr[code->data[code->pc + 1]]);
-            code->pc += 2;
+            FillPushr(stk, code);
             break;
         case JMP:
             code->pc = code->data[code->pc + 1];
             break;
         case JA:
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            //printf("%d %d\n", value_1, value_2);
-            if (value_1 > value_2) code->pc = code->data[code->pc + 1];
-            else code->pc += 2;
+            FillJa(stk, code);
             break;
         case JAE:
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            //printf("%d %d\n", value_1, value_2);
-            if (value_1 >= value_2) code->pc = code->data[code->pc + 1];
-            else code->pc += 2;
+            FillJae(stk, code);
             break;
         case JB:
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            //printf("%d %d\n", value_1, value_2);
-            if (value_1 < value_2) code->pc = code->data[code->pc + 1];
-            else code->pc += 2;
+            FillJb(stk, code);
             break;
         case JBE:
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            //printf("%d %d\n", value_1, value_2);
-            if (value_1 <= value_2) code->pc = code->data[code->pc + 1];
-            else code->pc += 2;
+            FillJbe(stk, code);
             break;
         case JE:
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            //printf("%d %d\n", value_1, value_2);
-            if (value_1 == value_2) code->pc = code->data[code->pc + 1];
-            else code->pc += 2;
+            FillJe(stk, code);
             break;
         case JNE:
-            StackPop(stk, &value_1);
-            StackPop(stk, &value_2);
-            //printf("%d %d\n", value_1, value_2);
-            if (value_1 != value_2) code->pc = code->data[code->pc + 1];
-            else code->pc += 2;
+            FillJne(stk, code);
             break;
         case IN:
-            code->pc += 1;
-            scanf("%d", &answer);
-            //printf("%d\n", answer);
-            StackPush(stk, answer);
-            //printf("%d\n", code->pc);
+            FillIn(stk, code);
             break;
         case CALL:
-            StackPush(&foo, code->pc + 2);
-            //printf("%d\n", code->pc + 2);
-            code->pc = code->data[code->pc + 1];
+            FillCall(&foo, code);
             break;
         case RET:
-            StackPop(&foo, &answer);
-            code->pc = answer;
+            FillRet(&foo, code);
             break;
         }
     }
