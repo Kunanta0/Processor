@@ -3,35 +3,14 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "proc.h"
 #define LABELS_SIZE 50
 
 enum
 {
-    HLT = 0,
-    PUSH = 1,
-    ADD = 2,
-    SUB = 3,
-    DIV = 4,
-    OUT = 5,
-    MUL = 6,
-    POP = 7,
-    PUSHr = 8,
-    JMP = 9,
-    JA = 10,
-    JAE = 11,
-    JB = 12,
-    JBE = 13,
-    JE = 14,
-    JNE = 15,
-    CALL = 16,
-    RET = 17,
-    IN = 18
-};
-
-enum
-{
     NO_LABEL = 0,
-    WITH_LABEL = 1
+    WITH_LABEL = 1,
+    ERROR = 2
 };
 
 
@@ -83,7 +62,7 @@ void WriteCode(Translator* arr, const char* filename, size_t nlines)
             fprintf(output, "%d", curr.line[j]);
             if (j < curr.length - 1) fprintf(output, " ");
         }
-        if (i < nlines - 1) fprintf(output, "\n");
+        if (i < nlines - 1 && curr.length != 0) fprintf(output, "\n");
     }
 
 }
@@ -152,7 +131,7 @@ Translator FillCode(char* buffer, size_t length, size_t* nlines)
         Machine.current_translating = 0;
         for (size_t i = 0; i < *nlines; ++i)
         {
-            printf("[%lld]\n", Machine.current_translating);
+            //printf("[%lld]\n", Machine.current_translating);
             GetLine(&Machine, buffer + index_lines[i], i);
             Machine.current_translating += Machine.code[i].length;
         }
@@ -168,7 +147,7 @@ void GetLine(Translator* Machine, char* line, size_t i)
     char cmd[10];
     int number;
     (Machine->code[i]).length = sscanf(line, "%5s %d", cmd, &number);
-    printf("{%s} {%d}\n", cmd, Machine->code[i].length);
+    //printf("{%s} {%d}\n", cmd, Machine->code[i].length);
 
     if (strcmp(cmd, "POP") == 0 || (strcmp(cmd, "PUSH") == 0 && (Machine->code[i]).length == 1))
     {
@@ -182,7 +161,7 @@ void GetLine(Translator* Machine, char* line, size_t i)
         if (strcmp(reg, "BX") == 0) (Machine->code[i]).line[1] = 1;
         if (strcmp(reg, "CX") == 0) (Machine->code[i]).line[1] = 2;
         if (strcmp(reg, "DX") == 0) (Machine->code[i]).line[1] = 3;
-        fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
+        //fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
         return;
     }
 
@@ -200,13 +179,19 @@ void GetLine(Translator* Machine, char* line, size_t i)
         if ((Machine->code[i]).length == 2)
         {
             (Machine->code[i]).line[1] = number;
-            fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
+            //fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
         }
-        if ((Machine->code[i]).length == 1)
+        /*if ((Machine->code[i]).length == 1)
         {
             fprintf(stdout, "%d\n", (Machine->code[i]).line[0]);
-        }
+        }*/
+        return;
     }
+
+    if (state == WITH_LABEL) return;
+
+    printf("Error by address %d in file\n", Machine->current_translating);
+    exit(EXIT_FAILURE);
 }
 
 char* ReadFile(const char* name, size_t* length)
@@ -240,7 +225,7 @@ int GetCommand(Translator* Machine, char* cmd, char* line, size_t i)
         if (strcmp(cmd, "JBE") == 0) (Machine->code[i]).line[0] = JBE;
         if (strcmp(cmd, "JE") == 0) (Machine->code[i]).line[0] = JE;
         if (strcmp(cmd, "JNE") == 0) (Machine->code[i]).line[0] = JNE;
-        printf("!%d!\n", Machine->code[i].length);
+        //printf("!%d!\n", Machine->code[i].length);
         if (Machine->code[i].length == 1)
         {
             char a[5] = {};
@@ -250,13 +235,19 @@ int GetCommand(Translator* Machine, char* cmd, char* line, size_t i)
             //PrintLabels(Machine);
             Machine->code[i].line[1] = (Machine->labels)[label];
             Machine->code[i].length = 2;
-            printf("{%d}\n", Machine->code[i].length);
+            //printf("{%d}\n", Machine->code[i].length);
             //printf("code[1] = %d\n", Machine->code[i].line[1]);
             return WITH_LABEL;
         }
+
+        if (Machine->code[i].length == 2) return NO_LABEL;
     }
 
-    return NO_LABEL;
+    return ERROR;
 }
 
-//походу придется либо редачить передачей транслятора по адресу, либо добавить поле label в Line. Второе легче, но много памяти жрет впустую
+//1. округление
+//2. структуры, функция
+//3. обработка одномерных массивов
+//4. бинарный поиск по ответу
+//5. dp
