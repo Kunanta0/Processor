@@ -27,33 +27,47 @@ typedef struct
     int labels[LABELS_SIZE];
 } Translator;
 
-Translator FillCode(char* buffer, size_t length, size_t* nlines);
+typedef struct
+{
+    char* buffer;
+    size_t length;
+    size_t nlines;
+    int* index_lines;
+} Text;
+
+Translator FillCode(Text* txt);
 size_t GetSize(const char* filename);
-size_t GetLines(char* buffer, size_t length);
+size_t GetLines(Text* txt);
 char* ReadFile(const char* name, size_t* length);
 void GetLine(Translator* Machine, char* line, size_t i);
 void WriteCode(Translator* arr, const char* filename, size_t nlines);
 int GetCommand(Translator* Machine, char* cmd, char* line, size_t i);
 void FillLabels(Translator* Machine);
+Text FillText();
+void Assemble(Translator* Machine, Text* txt);
+void Destroy(Translator* Machine, Text* txt);
+void FillRegisters(Translator* Machine, char* cmd, char* line, size_t i);
 
 int main()
 {
-    size_t length = 0;
-    char* buffer = ReadFile("code.txt", &length);
-    //printf("%s\n", buffer);
+    Text txt = FillText();
+    Translator code = FillCode(&txt);
 
-    size_t nlines = 0;
-    Translator code = FillCode(buffer, length, &nlines);
-
-    WriteCode(&code, "machine_code.txt", nlines);
-    free(buffer);
-    free(code.code);
+    WriteCode(&code, "machine_code.txt", txt.nlines);
+    Destroy(&code, &txt);
     return 0;
+}
+
+void Destroy(Translator* code, Text* txt)
+{
+    free(txt->buffer);
+    free(txt->index_lines);
+    free(code->code);
 }
 
 void WriteCode(Translator* arr, const char* filename, size_t nlines)
 {
-    FILE* output = fopen(filename, "a");
+    FILE* output = fopen(filename, "w");
     for (size_t i = 0; i < nlines; ++i)
     {
         Line curr = (arr->code)[i];
@@ -67,6 +81,27 @@ void WriteCode(Translator* arr, const char* filename, size_t nlines)
 
 }
 
+Text FillText()
+{
+    Text txt = {};
+    txt.buffer = ReadFile("code.txt", &(txt.length));
+    txt.nlines = GetLines(&txt);
+
+    txt.index_lines = (int*)calloc(txt.nlines, sizeof(int));
+
+    size_t j = 0;
+    txt.index_lines[0] = 0;
+    for (size_t i = 0; i < txt.length; ++i)
+    {
+        if (txt.buffer[i] == '\0')
+        {
+            txt.index_lines[++j] = i + 1;
+        }
+    }
+
+    return txt;
+}
+
 size_t GetSize(const char* filename)
 {
     struct stat file_info;
@@ -74,14 +109,14 @@ size_t GetSize(const char* filename)
     return file_info.st_size;
 }
 
-size_t GetLines(char* buffer, size_t length)
+size_t GetLines(Text* txt)
 {
     size_t nlines = 0;
-    for (size_t i = 0; i < length; ++i)
+    for (size_t i = 0; i < txt->length; ++i)
     {
-        if (buffer[i] == '\n')
+        if (txt->buffer[i] == '\n')
         {
-            buffer[i] = '\0';
+            txt->buffer[i] = '\0';
             ++nlines;
         }
     }
@@ -103,43 +138,29 @@ void PrintLabels(Translator* Machine)
     getchar();
 }
 
-Translator FillCode(char* buffer, size_t length, size_t* nlines)
+Translator FillCode(Text* txt)
 {
-    *nlines = GetLines(buffer, length);
-    //printf("%lld\n", *nlines);
-
     Translator Machine = {};
-    Machine.code = (Line*)calloc(*nlines, sizeof(Line));
+    Machine.code = (Line*)calloc(txt->nlines, sizeof(Line));
 
     FillLabels(&Machine);
     //PrintLabels(&Machine);
 
-    int* index_lines = (int*)calloc(*nlines, sizeof(int));
-
-    size_t j = 0;
-    index_lines[0] = 0;
-    for (size_t i = 0; i < length; ++i)
-    {
-        if (buffer[i] == '\0')
-        {
-            index_lines[++j] = i + 1;
-        }
-    }
-
-    for (size_t j = 0; j < 2; ++j)
-    {
-        Machine.current_translating = 0;
-        for (size_t i = 0; i < *nlines; ++i)
-        {
-            //printf("[%lld]\n", Machine.current_translating);
-            GetLine(&Machine, buffer + index_lines[i], i);
-            Machine.current_translating += Machine.code[i].length;
-        }
-    }
-
-    free(index_lines);
+    Assemble(&Machine, txt);
+    Assemble(&Machine, txt);
 
     return Machine;
+}
+
+void Assemble(Translator* Machine, Text* txt)
+{
+    Machine->current_translating = 0;
+    for (size_t i = 0; i < txt->nlines; ++i)
+    {
+        //printf("[%lld]\n", Machine.current_translating);
+        GetLine(Machine, txt->buffer + txt->index_lines[i], i);
+        Machine->current_translating += Machine->code[i].length;
+    }
 }
 
 void GetLine(Translator* Machine, char* line, size_t i)
@@ -151,17 +172,7 @@ void GetLine(Translator* Machine, char* line, size_t i)
 
     if (strcmp(cmd, "POP") == 0 || (strcmp(cmd, "PUSH") == 0 && (Machine->code[i]).length == 1))
     {
-        (Machine->code[i]).length = 2;
-        if (strcmp(cmd, "POP") == 0) (Machine->code[i]).line[0] = POP;
-        if (strcmp(cmd, "PUSH") == 0) (Machine->code[i]).line[0] = PUSHr;
-        char reg[3];
-        sscanf(line, "%s %s", cmd, reg);
-        //printf("reg: %s\n", reg);
-        if (strcmp(reg, "AX") == 0) (Machine->code[i]).line[1] = 0;
-        if (strcmp(reg, "BX") == 0) (Machine->code[i]).line[1] = 1;
-        if (strcmp(reg, "CX") == 0) (Machine->code[i]).line[1] = 2;
-        if (strcmp(reg, "DX") == 0) (Machine->code[i]).line[1] = 3;
-        //fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
+        FillRegisters(Machine, cmd, line, i);
         return;
     }
 
@@ -190,8 +201,23 @@ void GetLine(Translator* Machine, char* line, size_t i)
 
     if (state == WITH_LABEL) return;
 
-    printf("Error by address %d in file\n", Machine->current_translating);
+    printf("Error by address %lld in file\n", Machine->current_translating);
     exit(EXIT_FAILURE);
+}
+
+void FillRegisters(Translator* Machine, char* cmd, char* line, size_t i)
+{
+    (Machine->code[i]).length = 2;
+    if (strcmp(cmd, "POP") == 0) (Machine->code[i]).line[0] = POP;
+    if (strcmp(cmd, "PUSH") == 0) (Machine->code[i]).line[0] = PUSHr;
+    char reg[3];
+    sscanf(line, "%s %s", cmd, reg);
+    //printf("reg: %s\n", reg);
+    if (strcmp(reg, "AX") == 0) (Machine->code[i]).line[1] = 0;
+    if (strcmp(reg, "BX") == 0) (Machine->code[i]).line[1] = 1;
+    if (strcmp(reg, "CX") == 0) (Machine->code[i]).line[1] = 2;
+    if (strcmp(reg, "DX") == 0) (Machine->code[i]).line[1] = 3;
+    //fprintf(stdout, "%d %d\n", (Machine->code[i]).line[0], (Machine->code[i]).line[1]);
 }
 
 char* ReadFile(const char* name, size_t* length)
@@ -245,9 +271,3 @@ int GetCommand(Translator* Machine, char* cmd, char* line, size_t i)
 
     return ERROR;
 }
-
-//1. округление
-//2. структуры, функция
-//3. обработка одномерных массивов
-//4. бинарный поиск по ответу
-//5. dp
