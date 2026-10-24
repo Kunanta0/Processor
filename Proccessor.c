@@ -36,7 +36,8 @@ typedef int StackElem_t;
     JNE = 15,//
     CALL = 16,
     RET = 17,
-    IN = 18
+    IN = 18,
+    PUSHm = 19
 };*/
 
 typedef struct
@@ -45,6 +46,7 @@ typedef struct
     size_t length;
     int pc;
     int registr[4];
+    //int mem[32][32];
 } Processor;
 
 char* ReadFile(const char* name, size_t* length);
@@ -215,15 +217,38 @@ void FillIn(stack_t* stk, Processor* code)
     StackPush(stk, answer);
     //printf("%d\n", code->pc);
 }
+void FillPushm(Processor* code)
+{
+    code->mem[code->data[(code->pc + 1) / 32]][code->data[(code->pc + 1) % 32]] = 1;
+}
+
+/*void InitMem(Processor* code)
+{
+    for (int i = 0; i < 32; ++i)
+    {
+        for (int j = 0; j < 32; ++j)
+        {
+            code->mem[i][j] = 0;
+        }
+    }
+}
+void FillRam(Processor* code)
+{
+    if (code->data[code-])
+    if (mem[code->data[(code->pc + 1) / 32]][code->data[(code->pc + 1) % 32]] == 1)
+}*/
 
 void Run(Processor* code)
 {
     stack_t foo = {};
     stack_t stak = {};
+
     StackCtor(&foo, 1);
     stack_t* stk = &stak;
     StackCtor(stk, 1);
+    //InitMem(code);
     code->pc = 0;
+
     while (code->pc < code->length)
     {
     //ProcessorDump(code);
